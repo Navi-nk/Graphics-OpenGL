@@ -1,0 +1,1 @@
+This repo houses the practice code for learning opengl.  
