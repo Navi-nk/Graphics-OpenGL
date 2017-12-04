@@ -5,7 +5,32 @@
 #include<fstream>
 #include<string>
 
+#define ASSERT(x) if(!(x)) __debugbreak();
+
+#ifdef DEBUG 
+	#define GLCALL(x) GlClearError();\
+	x;\
+	ASSERT(GlCheckError(#x, __FILE__,__LINE__));
+#else
+	#define GLCALL(x) x;
+#endif 
+
 typedef unsigned int uint;
+
+
+static void GlClearError() 
+{
+	while (glGetError());
+}
+
+static bool GlCheckError(const char* f, const char* file, int line)
+{
+	while (GLenum error = glGetError()) {
+		std::cout << "GL error :" << error <<" in "<< file<<" at "<<line<< std::endl;
+		return false;
+	}
+	return true;
+}
 
 struct ShaderSources
 {
@@ -109,6 +134,7 @@ int main(void)
 
 	/* Make the window's context current */
 	glfwMakeContextCurrent(window);
+	glfwSwapInterval(1);
 
 	if (glewInit() != GLEW_OK) {
 		std::cout << "error" << std::endl;
@@ -117,15 +143,31 @@ int main(void)
 	//print open gl version
 	//std::cout << glGetString(GL_VERSION) << std::endl;
 
-	float positions[6] = { 
-		-0.5f, 0.0f, 
-		 0.0f, 0.5f, 
-		 0.5f, 0.0f };
+	float positions[] = { 
+		 -0.5f, -0.5f, 
+		  0.5f, -0.5f, 
+		  0.5f, 0.5f,
+	
+		 //-0.5f,-0.5f,
+		 -0.5f,0.5f,
+		 //0.5f, 0.5f
+		};
 
-	unsigned int buffer;
+	uint indices[] = {
+		0, 1, 2,
+		0, 3, 2
+	};
+
+	uint buffer;
 	glGenBuffers(1, &buffer);
 	glBindBuffer(GL_ARRAY_BUFFER, buffer);
-	glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(float), positions, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, 8 * sizeof(float), positions, GL_STATIC_DRAW);
+
+
+	uint indexBuffer;
+	glGenBuffers(1, &indexBuffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(uint), indices, GL_STATIC_DRAW);
 
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
@@ -136,7 +178,13 @@ int main(void)
 
 	uint shader = CreateShader(ss->vertexShader, ss->fragmentShader);
 	delete(ss);
-	glUseProgram(shader);
+	GLCALL(glUseProgram(shader));
+
+	GLCALL(GLint location = glGetUniformLocation(shader,"u_Color"));
+	ASSERT(location != -1);
+	GLCALL(glUniform4f(location, 0.9f, 0.4f, 0.7f, 1.0f));
+	float r = 0.0f;
+	float increment = 0.05f;
 	/* Loop until the user closes the window */
 	while (!glfwWindowShouldClose(window))
 	{
@@ -149,9 +197,23 @@ int main(void)
 		glVertex2f(0.0f,0.0f);
 		glVertex2f(0.5f, -0.5f);
 		glEnd();*/
+		
+		//GlClearError();
+		//glDrawArrays(GL_TRIANGLES, 0, 6); //draw square using vertex buffer
+		//glDrawElements(GL_TRIANGLES, 6, GL_INT, nullptr); //draw square using index buffer
+		//ASSERT(GlCheckError());
 
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-		//glDrawElements()
+		GLCALL(glUniform4f(location, r, 0.4f, 0.0f, 1.0f));
+		//use macros to wrap the open gl function with error handling code
+		GLCALL(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr));
+		
+		//Simple color toggle logic
+		if (r > 1.0f)
+			increment = -0.05f;
+		else if(r < 0.0f)
+			increment = 0.05f;
+		r += increment;
+
 		/* Swap front and back buffers */
 		glfwSwapBuffers(window);
 
